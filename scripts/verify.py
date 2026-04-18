@@ -7,10 +7,15 @@ Usage:
     python3 verify.py summary <file_or_glob>  Print a quick count summary
     python3 verify.py replace <file> <json>   Apply replacements from a JSON file
 
-Tag formats recognized:
+Tag formats recognized (any uppercase tag label):
     {{VERIFY: claim | suggested source}}
     {{RESEARCH NEEDED: claim | suggested source}}
     {{SOURCE NEEDED: claim | suggested source}}
+    {{MANUAL CHECK: claim | tried: ...}}
+    {{FACT CHECK: ...}}, {{CITE: ...}}, {{CITATION NEEDED: ...}}, etc.
+
+Any tag matching {{<UPPERCASE LABEL>: ...}} is treated as a verification tag,
+excluding a small allowlist of non-verification template tags (e.g. TOC).
 """
 
 import argparse
@@ -21,9 +26,13 @@ import re
 import sys
 from pathlib import Path
 
+# Match any {{LABEL: claim | source}} where LABEL is uppercase words (A-Z, spaces, -, _).
 TAG_PATTERN = re.compile(
-    r"\{\{(VERIFY|RESEARCH NEEDED|SOURCE NEEDED):\s*(.+?)\s*(?:\|\s*(.+?)\s*)?\}\}"
+    r"\{\{([A-Z][A-Z0-9 _\-]*?):\s*(.+?)\s*(?:\|\s*(.+?)\s*)?\}\}"
 )
+
+# Labels to ignore -- these are not verification tags.
+IGNORED_LABELS = {"TOC", "TABLE OF CONTENTS", "INCLUDE", "TEMPLATE"}
 
 
 def parse_file(filepath: str) -> list[dict]:
@@ -53,7 +62,9 @@ def parse_file(filepath: str) -> list[dict]:
             continue
 
         for match in TAG_PATTERN.finditer(line):
-            tag_type = match.group(1)
+            tag_type = match.group(1).strip()
+            if tag_type in IGNORED_LABELS:
+                continue
             claim = match.group(2).strip()
             suggested_source = (match.group(3) or "").strip()
 
@@ -145,10 +156,8 @@ def summary(tags: list[dict]):
 
     print(f"Files scanned: {len(files)}")
     print(f"Total tags: {len(tags)}")
-    for tag_type in ["VERIFY", "RESEARCH NEEDED", "SOURCE NEEDED"]:
-        count = len(by_type.get(tag_type, []))
-        if count:
-            print(f"  {tag_type}: {count}")
+    for tag_type in sorted(by_type.keys()):
+        print(f"  {tag_type}: {len(by_type[tag_type])}")
 
 
 def main():

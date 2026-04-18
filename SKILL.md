@@ -2,9 +2,10 @@
 name: seo-agi-verify
 version: "1.0.0"
 description: >
-  Resolve {{VERIFY}}, {{RESEARCH NEEDED}}, and {{SOURCE NEEDED}} tags in SEO AGI
-  output pages. Searches for real data, confirms or corrects claims, and replaces
-  tags inline with verified facts and source URLs.
+  Resolve {{VERIFY}}, {{RESEARCH NEEDED}}, {{SOURCE NEEDED}}, {{MANUAL CHECK}},
+  {{FACT CHECK}}, {{CITATION NEEDED}}, and any other {{UPPERCASE LABEL: ...}}
+  verification tag in SEO AGI output pages. Searches for real data, confirms or
+  corrects claims, and replaces tags inline with verified facts and source URLs.
   Triggers on: "verify seo page", "seo-agi-verify", "resolve verify tags",
   "fact-check seo page", "verify claims", "run verification".
 argument-hint: "<file_path_or_glob>"
@@ -81,10 +82,17 @@ This outputs JSON:
 ]
 ```
 
+The parser recognizes **any** `{{UPPERCASE LABEL: claim | source}}` tag, not just
+`VERIFY`. This includes `MANUAL CHECK`, `FACT CHECK`, `CITATION NEEDED`, `CITE`,
+`CONFIRM`, `TODO`, etc. — so rerunning the skill on a partially-verified page
+re-attempts every outstanding tag (including `MANUAL CHECK` tags this skill
+wrote in a previous run).
+
 If no script is available, parse tags manually using this regex:
 ```
-\{\{(VERIFY|RESEARCH NEEDED|SOURCE NEEDED):\s*(.+?)\s*(?:\|\s*(.+?)\s*)?\}\}
+\{\{([A-Z][A-Z0-9 _\-]*?):\s*(.+?)\s*(?:\|\s*(.+?)\s*)?\}\}
 ```
+Ignore labels in the allowlist `{TOC, TABLE OF CONTENTS, INCLUDE, TEMPLATE}`.
 
 ---
 
@@ -163,10 +171,16 @@ After:  The garage daily rate is $25<!-- source: https://example.gov/parking-rat
 
 ### For UNVERIFIED claims:
 
-Replace the tag with a manual-check tag:
+Replace the tag with a manual-check tag, appending to prior attempts if the
+input was already a `{{MANUAL CHECK}}` tag (do not overwrite earlier `tried:`
+notes — append with `;`):
 ```
 {{MANUAL CHECK: [claim] | tried: [brief description of what was searched]}}
 ```
+
+On a **re-run**, `MANUAL CHECK` tags are re-parsed and re-attempted. Only leave
+a tag as `MANUAL CHECK` after exhausting Steps 1–5 again. If you have attempted
+twice with no result, that is acceptable — flag in the report and move on.
 
 Example:
 ```
