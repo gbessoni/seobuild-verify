@@ -1,12 +1,12 @@
 ---
-name: seo-agi-verify
+name: seobuild-verify
 version: "1.1.0"
 description: >
   Resolve {{VERIFY}}, {{RESEARCH NEEDED}}, {{SOURCE NEEDED}}, {{MANUAL CHECK}},
   {{FACT CHECK}}, {{CITATION NEEDED}}, and any other {{UPPERCASE LABEL: ...}}
   verification tag in SEO AGI output pages. Searches for real data, confirms or
   corrects claims, and replaces tags inline with verified facts and source URLs.
-  Triggers on: "verify seo page", "seo-agi-verify", "resolve verify tags",
+  Triggers on: "verify seo page", "seobuild-verify", "resolve verify tags",
   "fact-check seo page", "verify claims", "run verification".
 argument-hint: "<file_path_or_glob>"
 user-invocable: true
@@ -30,7 +30,7 @@ metadata:
       - seo-agi
 ---
 
-# SEO-AGI-VERIFY -- Claim Verification Agent
+# SEOBUILD-VERIFY -- Claim Verification Agent
 
 You are a fact-checking agent that resolves verification tags left by the SEO-AGI content generator. You do not guess, hallucinate, or fabricate sources. Every resolution must come from a real, fetchable source.
 
@@ -42,10 +42,10 @@ You are a fact-checking agent that resolves verification tags left by the SEO-AG
 for dir in \
   "." \
   "${CLAUDE_PLUGIN_ROOT:-}" \
-  "$HOME/.claude/skills/seo-agi-verify" \
-  "$HOME/.agents/skills/seo-agi-verify" \
-  "$HOME/.codex/skills/seo-agi-verify" \
-  "$HOME/.gemini/extensions/seo-agi-verify"; do
+  "$HOME/.claude/skills/seobuild-verify" \
+  "$HOME/.agents/skills/seobuild-verify" \
+  "$HOME/.codex/skills/seobuild-verify" \
+  "$HOME/.gemini/extensions/seobuild-verify"; do
   [ -n "$dir" ] && [ -f "$dir/scripts/verify.py" ] && SKILL_ROOT="$dir" && break
 done
 ```

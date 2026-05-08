@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-SEO-AGI-VERIFY tag parser.
+SEOBUILD-VERIFY tag parser.
 
 Usage:
     python3 verify.py parse <file_or_glob>    Extract all verification tags as JSON
