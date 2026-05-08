@@ -1,6 +1,6 @@
 ---
 name: seo-agi-verify
-version: "1.0.0"
+version: "1.1.0"
 description: >
   Resolve {{VERIFY}}, {{RESEARCH NEEDED}}, {{SOURCE NEEDED}}, {{MANUAL CHECK}},
   {{FACT CHECK}}, {{CITATION NEEDED}}, and any other {{UPPERCASE LABEL: ...}}
@@ -52,7 +52,61 @@ done
 
 ---
 
-## 1. INPUT
+## 1. TAG TYPES (first-class)
+
+Verification tags are the contract between seobuild-onpage and seobuild-verify. Each tag type signals a different state and triggers different resolution behavior. All tags share the shape `{{LABEL: claim | metadata}}`. The parser (Section 1.5) accepts any uppercase label, but these four are canonical:
+
+### `{{VERIFY: claim | suggested source}}`
+**Meaning:** A specific factual claim (number, rate, capacity, schedule, distance, cost) with a known or suggested source. Originates in seobuild-onpage when the writer has a number but cannot personally confirm it from inside the LLM.
+**Resolution behavior:** Run full Steps 1-5 (search, fetch, validate, replace inline). The skill *will* succeed or fail definitively on these.
+**Example:** `{{VERIFY: Garage daily rate $20 | County Parking Rates PDF}}`
+
+### `{{RESEARCH NEEDED: claim | hint}}`
+**Meaning:** A data point the writer believes exists but did not have time or sources for. Less specific than VERIFY -- the claim itself may need shaping, not just sourcing.
+**Resolution behavior:** Same as VERIFY but expect more search iteration. If the data simply doesn't exist publicly, downgrade to MANUAL CHECK.
+**Example:** `{{RESEARCH NEEDED: Garage total capacity | check master plan PDF}}`
+
+### `{{SOURCE NEEDED: claim | hint}}`
+**Meaning:** The claim is correct in the writer's view but lacks a citation. Often used for industry-standard knowledge or operational specifics that require traceable backing.
+**Resolution behavior:** Search authoritative sources (.gov, .edu, official entity domain). If found, replace with inline citation comment. If not, downgrade to MANUAL CHECK.
+**Example:** `{{SOURCE NEEDED: shuttle frequency every 12 minutes | ground transportation page}}`
+
+### `{{MANUAL CHECK: claim | tried: notes}}` -- v1.1.0 first-class
+**Meaning:** A claim that **cannot be machine-verified**. This is now a canonical input AND output tag, not just a "fallback" status. Use it deliberately for:
+
+- **Subjective or experiential claims** the LLM should not assert without human eyes -- "the lighting is good at night," "the staff was helpful"
+- **Local operational knowledge** that has no online source -- "this lot fills by 6am on Saturdays" (true, but no published source)
+- **Time-sensitive claims** where last-known data is older than 18 months and may have changed
+- **Conflicting-source claims** where two authoritative sources disagree
+- **Failed VERIFY/RESEARCH/SOURCE attempts** -- this skill writes MANUAL CHECK when Steps 1-5 exhaust without confirmation, with `tried:` notes describing what was searched
+
+**Resolution behavior on re-run:** MANUAL CHECK tags are **re-parsed and re-attempted on every run** (the parser at Section 1.5 treats MANUAL CHECK as a verification tag, not a sealed annotation). The `tried:` notes are *appended* across runs, never overwritten -- so a tag that has been retried 3 times shows the cumulative search history, separated by `;`. After two failed runs, leave the tag and surface it in the **Manual Follow-ups Required** section of the report (Section 5).
+
+**Inputs from seobuild-onpage:** When seobuild-onpage emits a `{{MANUAL CHECK}}` tag deliberately (option 1-4 above), the writer should pre-populate `tried:` with `tried: by-design (subjective/local-knowledge/time-sensitive)` so this skill knows not to spend cycles searching.
+
+**Examples:**
+```
+Input from seobuild-onpage (deliberate, subjective):
+  {{MANUAL CHECK: terminal pickup is faster than ride-share queue at peak | tried: by-design (experiential)}}
+
+Output from this skill (after failed search):
+  {{MANUAL CHECK: Garage total capacity | tried: searched county master plan PDF, airport website, no capacity data found}}
+
+Re-run output (second failed attempt, append):
+  {{MANUAL CHECK: Garage total capacity | tried: searched county master plan PDF, airport website, no capacity data found; retried 2026-05-08 with FOIA-filed PDF, still no figure}}
+```
+
+### Why MANUAL CHECK is now first-class
+
+In v1.0 of this skill, MANUAL CHECK was only an output state for failed verification. That undersold it. Some claims **should never be auto-verified** because the source either doesn't exist publicly or because the answer requires human judgment. Treating MANUAL CHECK as a deliberate input lets the writer flag those claims explicitly, prevents the skill from wasting cycles, and creates a clean queue for the human reviewer to triage. It also makes the verification cycle idempotent: re-running this skill on a partially-verified page picks up exactly where the prior run left off.
+
+### Other accepted labels (passthrough)
+
+The parser also recognizes `{{FACT CHECK}}`, `{{CITE}}`, `{{CITATION NEEDED}}`, `{{CONFIRM}}`, `{{TODO}}`, and any other uppercase label. These are treated as VERIFY-equivalent. Allowlisted non-verification labels (`TOC`, `TABLE OF CONTENTS`, `INCLUDE`, `TEMPLATE`) are skipped.
+
+---
+
+## 1.5 INPUT
 
 Accept one of:
 - A **file path** to a single HTML/MD page (e.g. `~/Documents/SEO-AGI/pages/foo.html`)
