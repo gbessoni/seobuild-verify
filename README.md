@@ -1,6 +1,6 @@
 # seobuild-verify
 
-Automated fact-checking for AI-generated SEO pages. Resolves `{{VERIFY}}`, `{{RESEARCH NEEDED}}`, and `{{SOURCE NEEDED}}` tags with real, sourced data -- so nothing publishes with a guess in it.
+Automated fact-checking for AI-generated SEO pages. Resolves `{{VERIFY}}`, `{{RESEARCH NEEDED}}`, `{{SOURCE NEEDED}}`, and `{{MANUAL CHECK}}` tags with real, sourced data -- so nothing publishes with a guess in it. Any uppercase-label tag (`{{FACT CHECK}}`, `{{CITATION NEEDED}}`, etc.) also works.
 
 Built to run as the final step in the SEO AGI pipeline, or standalone on any page that uses the verification tag format.
 
@@ -102,8 +102,11 @@ SEO-AGI is forbidden from inventing statistics. Instead, it inserts tags:
 | `{{VERIFY}}` | Any specific price, rate, capacity, schedule, distance, or operational claim | `{{VERIFY: Garage daily rate $20 \| County Parking Rates PDF}}` |
 | `{{RESEARCH NEEDED}}` | A section that needs hard data the agent couldn't find | `{{RESEARCH NEEDED: Garage total capacity \| check master plan PDF}}` |
 | `{{SOURCE NEEDED}}` | A claim that needs a traceable citation before publish | `{{SOURCE NEEDED: shuttle frequency \| check ground transportation page}}` |
+| `{{MANUAL CHECK}}` (v1.1.0) | A claim that **cannot be machine-verified** -- subjective, local-knowledge, time-sensitive, or already-failed-to-resolve. Both an input (deliberate, with `tried: by-design`) and an output (after exhausting auto-verification). | `{{MANUAL CHECK: terminal pickup is faster than ride-share queue \| tried: by-design (experiential)}}` |
 
-Every tag includes the claim and a suggested source. A typical SEO-AGI page has 10-25 tags. Publishing with tags still in the HTML is the SEO equivalent of shipping with TODO comments in production.
+Every tag includes the claim and a suggested source (or, for MANUAL CHECK, a `tried:` note). A typical SEO-AGI page has 10-25 tags. Publishing with tags still in the HTML is the SEO equivalent of shipping with TODO comments in production.
+
+`{{MANUAL CHECK}}` tags are **re-parsed and re-attempted on every run**. The `tried:` notes are *appended* across runs (separated by `;`), never overwritten -- so a tag that's been retried 3 times shows the cumulative search history. After two failed runs, it surfaces in the **Manual Follow-ups Required** section of the verification report. See `SKILL.md` Section 1 for full semantics.
 
 ---
 
@@ -253,10 +256,10 @@ python3 scripts/verify.py replace path/to/page.html replacements.json
 
 ## Tag Format Reference
 
-The parser recognizes this regex:
+The parser recognizes any uppercase-label tag via this regex:
 
 ```
-\{\{(VERIFY|RESEARCH NEEDED|SOURCE NEEDED):\s*(.+?)\s*(?:\|\s*(.+?)\s*)?\}\}
+\{\{([A-Z][A-Z0-9 _\-]*?):\s*(.+?)\s*(?:\|\s*(.+?)\s*)?\}\}
 ```
 
 Breaking it down:
@@ -264,10 +267,15 @@ Breaking it down:
 ```
 {{TAG_TYPE: claim text | suggested source}}
   │          │            │
-  │          │            └─ Optional. Where to look for confirmation.
+  │          │            └─ Optional. Where to look for confirmation
+  │          │               (or, for MANUAL CHECK, a `tried:` note).
   │          └────────────── Required. The specific claim to verify.
-  └───────────────────────── Required. VERIFY, RESEARCH NEEDED, or SOURCE NEEDED.
+  └───────────────────────── Required. Any uppercase label: VERIFY,
+                              RESEARCH NEEDED, SOURCE NEEDED, MANUAL CHECK,
+                              FACT CHECK, CITE, CITATION NEEDED, etc.
 ```
+
+The parser also accepts an allowlist of non-verification labels it skips: `TOC`, `TABLE OF CONTENTS`, `INCLUDE`, `TEMPLATE`. Add to this list in `scripts/verify.py` if you have other custom tags.
 
 The pipe `|` separator is optional. Tags without a suggested source are valid:
 
